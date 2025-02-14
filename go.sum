@@ -1,7 +1,5 @@
 github.com/agent-api/core v0.0.0-20250213143732-77b2a39cf1f9 h1:bxpmrZmFlrhXZrs3lKnCMa/8jLYji9QD8LhK4wNjfUU=
 github.com/agent-api/core v0.0.0-20250213143732-77b2a39cf1f9/go.mod h1:dubJb1P6cSuYOqQvBX/R9inWvHPMDuXCEwqwZfzXWTk=
-github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
-github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/openai/openai-go v0.1.0-alpha.57 h1:WsOsIQzxXL3shbRs8xUoYgi1oSS4yyKEKDpQ0vhHijk=
 github.com/openai/openai-go v0.1.0-alpha.57/go.mod h1:3SdE6BffOX9HPEQv8IL/fi3LYZ5TUpRYaqGQZbyk11A=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=

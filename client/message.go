@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/agent-api/core/types"
@@ -15,10 +16,24 @@ func convertMessageToOpenAIMessage(m *types.Message) openai.ChatCompletionMessag
 
 	case types.AssistantMessageRole:
 		message := openai.AssistantMessage(m.Content)
+
+		toolCalls := []openai.ChatCompletionMessageToolCallParam{}
+		for _, t := range m.ToolCalls {
+			toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallParam{
+				ID:   openai.F(t.ID),
+				Type: openai.F(openai.ChatCompletionMessageToolCallType("function")),
+				Function: openai.F(openai.ChatCompletionMessageToolCallFunctionParam{
+					Name:      openai.F(t.Name),
+					Arguments: openai.F(string(t.Arguments)),
+				}),
+			})
+		}
+		message.ToolCalls = openai.F(toolCalls)
+
 		return message
 
 	case types.ToolMessageRole:
-		message := openai.ToolMessage("", m.Content)
+		message := openai.ToolMessage(m.ToolResult.ToolCallID, m.Content)
 		return message
 	}
 
@@ -47,12 +62,6 @@ func convertOpenAIMessageToMessage(m *openai.Message) types.Message {
 			Role:    types.AssistantMessageRole,
 			Content: content.String(),
 		}
-
-	case "tool":
-		return types.Message{
-			Role:    types.ToolMessageRole,
-			Content: content.String(),
-		}
 	}
 
 	return types.Message{}
@@ -67,15 +76,20 @@ func OpenAIChatCompletionMessageToAgentAPIMessage(m *openai.ChatCompletionMessag
 		}
 
 	case "assistant":
-		return types.Message{
-			Role:    types.AssistantMessageRole,
-			Content: m.Content,
+		t := []*types.ToolCall{}
+
+		for _, tool := range m.ToolCalls {
+			t = append(t, &types.ToolCall{
+				ID:        tool.ID,
+				Name:      tool.Function.Name,
+				Arguments: json.RawMessage(tool.Function.Arguments),
+			})
 		}
 
-	case "tool":
 		return types.Message{
-			Role:    types.ToolMessageRole,
-			Content: m.Content,
+			Role:      types.ToolMessageRole,
+			Content:   m.Content,
+			ToolCalls: t,
 		}
 	}
 

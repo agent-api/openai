@@ -2,8 +2,11 @@ package client
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/agent-api/core/types"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
@@ -49,22 +52,50 @@ func WithHTTPClient(client *http.Client) ClientOption {
 	return option.WithHTTPClient(client)
 }
 
+// Convert your Tool to OpenAI's ChatCompletionToolParam
+func ToOpenAIToolParam(t *types.Tool) (*openai.ChatCompletionToolParam, error) {
+	var schemaMap map[string]interface{}
+	if err := json.Unmarshal(t.JSONSchema, &schemaMap); err != nil {
+		return nil, err
+	}
+
+	return &openai.ChatCompletionToolParam{
+		Type: openai.F(openai.ChatCompletionToolTypeFunction),
+		Function: openai.F(openai.FunctionDefinitionParam{
+			Name:        openai.String(t.Name),
+			Description: openai.String(t.Description),
+			Parameters:  openai.F(openai.FunctionParameters(schemaMap)),
+		}),
+	}, nil
+}
+
 func (c *OpenAIClient) Chat(ctx context.Context, req *ChatRequest) (ChatResponse, error) {
 	openaiMessages := []openai.ChatCompletionMessageParamUnion{}
 
-	for _, message := range req.Messages {
+	for i, message := range req.Messages {
 		openaiMessage := convertMessageToOpenAIMessage(message)
+		fmt.Printf("message %d - %v\n", i, openaiMessage)
 		openaiMessages = append(openaiMessages, openaiMessage)
+	}
+
+	openaiTools := []openai.ChatCompletionToolParam{}
+
+	for _, tool := range req.Tools {
+		t, _ := ToOpenAIToolParam(tool)
+
+		openaiTools = append(openaiTools, *t)
 	}
 
 	res, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: openai.F(openaiMessages),
 		Model:    openai.F(c.model),
+		Tools:    openai.F(openaiTools),
 	})
-
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("res: %v\n", res.Choices[0].Message.Role)
 
 	m := OpenAIChatCompletionMessageToAgentAPIMessage(&res.Choices[0].Message)
 
