@@ -86,11 +86,16 @@ func (c *OpenAIClient) Chat(ctx context.Context, req *ChatRequest) (ChatResponse
 		openaiTools = append(openaiTools, *t)
 	}
 
-	res, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+	chatParams := openai.ChatCompletionNewParams{
 		Messages: openai.F(openaiMessages),
 		Model:    openai.F(c.model),
-		Tools:    openai.F(openaiTools),
-	})
+	}
+
+	if len(openaiTools) != 0 {
+		chatParams.Tools = openai.F(openaiTools)
+	}
+
+	res, err := c.client.Chat.Completions.New(ctx, chatParams)
 	if err != nil {
 		panic(err)
 	}
