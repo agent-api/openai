@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/agent-api/core/types"
@@ -17,12 +18,14 @@ type OpenAIClient struct {
 	client *openai.Client
 
 	model string
+
+	logger *slog.Logger
 }
 
 // ClientOption is a function that modifies the client
 type ClientOption option.RequestOption
 
-func NewClient(options ...ClientOption) *OpenAIClient {
+func NewClient(logger *slog.Logger, options ...ClientOption) *OpenAIClient {
 	o := &OpenAIClient{}
 
 	for _, option := range options {
@@ -34,6 +37,7 @@ func NewClient(options ...ClientOption) *OpenAIClient {
 	return &OpenAIClient{
 		client: client,
 		model:  "gpt-4o",
+		logger: logger,
 	}
 }
 
@@ -108,4 +112,108 @@ func (c *OpenAIClient) Chat(ctx context.Context, req *ChatRequest) (ChatResponse
 		Message: m,
 		Model:   res.Model,
 	}, nil
+}
+
+func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *ChatResponse, <-chan string, <-chan error, error) {
+	c.logger.Debug("received chat stream message request")
+	openaiMessages := []openai.ChatCompletionMessageParamUnion{}
+	for _, message := range req.Messages {
+		openaiMessages = append(openaiMessages, convertMessageToOpenAIMessage(message))
+	}
+
+	c.logger.Debug("creating openai tools")
+	openaiTools := []openai.ChatCompletionToolParam{}
+	for _, tool := range req.Tools {
+		t, err := ToOpenAIToolParam(tool)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("error converting tool: %w", err)
+		}
+		openaiTools = append(openaiTools, *t)
+	}
+
+	chatParams := openai.ChatCompletionNewParams{
+		Messages: openai.F(openaiMessages),
+		Model:    openai.F(req.Model),
+	}
+
+	if len(openaiTools) > 0 {
+		chatParams.Tools = openai.F(openaiTools)
+	}
+
+	msgChan := make(chan *ChatResponse)
+	deltaChan := make(chan string)
+	errChan := make(chan error, 1)
+
+	c.logger.Debug("kicking async go func for chat stream")
+
+	go func() {
+		stream := c.client.Chat.Completions.NewStreaming(ctx, chatParams)
+
+		defer close(msgChan)
+		defer close(deltaChan)
+		defer close(errChan)
+		defer stream.Close()
+
+		// Create accumulator for building the final message
+		acc := openai.ChatCompletionAccumulator{}
+
+		// holds the message to be processed and sent down through the Go chan
+		//currentMessage := &ChatResponse{}
+
+		// iterate SSE from OpenAI stream
+		for stream.Next() {
+			chunk := stream.Current()
+			acc.AddChunk(chunk)
+
+			delta := ""
+
+			if content, ok := acc.JustFinishedContent(); ok {
+				// send the final message.
+				// Blocks on reader grabbing message off channel
+				msgChan <- &ChatResponse{
+					Message: types.Message{
+						Content: content,
+					},
+				}
+			}
+
+			// if using tool calls
+			if tool, ok := acc.JustFinishedToolCall(); ok {
+				// send message with tool call to msg chan.
+				// blocks on message being consumed by consumer.
+				msgChan <- &ChatResponse{
+					Message: types.Message{
+						ToolCalls: []*types.ToolCall{
+							{
+								ID:        "woof_stream_tool",
+								Name:      tool.Name,
+								Arguments: json.RawMessage(tool.Arguments),
+							},
+						},
+					},
+				}
+			}
+
+			if refusal, ok := acc.JustFinishedRefusal(); ok {
+				c.logger.Error("unhandled refusal stream finished", "refusal", refusal)
+			}
+
+			if len(chunk.Choices) > 0 {
+				delta = chunk.Choices[0].Delta.Content
+			}
+
+			select {
+			case deltaChan <- delta:
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			}
+		}
+
+		if err := stream.Err(); err != nil {
+			errChan <- fmt.Errorf("stream error: %w", err)
+		}
+	}()
+
+	return msgChan, deltaChan, errChan, nil
 }

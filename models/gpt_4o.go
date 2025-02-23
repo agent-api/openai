@@ -5,7 +5,7 @@ import (
 )
 
 var GPT4_O *types.Model = &types.Model{
-	ID: "gpt4-o",
+	ID: "gpt-4o",
 }
 
 var GPT4_O_2024_11_20 *types.Model = &types.Model{

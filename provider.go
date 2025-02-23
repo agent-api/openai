@@ -35,8 +35,10 @@ func NewProvider(opts *ProviderOpts) *Provider {
 	opts.Logger.Info("Creating new OpenAI provider")
 
 	client := client.NewClient(
-	// TODO - need to enable local env variable, not just through opt
-	//client.WithAPIKey(opts.APIKey),
+		opts.Logger,
+
+		// TODO - need to enable local env variable, not just through opt
+		//client.WithAPIKey(opts.APIKey),
 	)
 
 	return &Provider{
@@ -85,7 +87,52 @@ func (p *Provider) Generate(ctx context.Context, opts *types.GenerateOptions) (*
 }
 
 // GenerateStream streams the response token by token
-func (p *Provider) GenerateStream(ctx context.Context, opts *types.GenerateOptions) (<-chan *types.Message, <-chan error) {
-	p.logger.Info("Stream generation not implemented yet")
-	return nil, nil
+func (p *Provider) GenerateStream(ctx context.Context, opts *types.GenerateOptions) (<-chan *types.Message, <-chan string, <-chan error) {
+	p.logger.Info("Starting stream generation", "modelID", p.model.ID)
+
+	msgChan := make(chan *types.Message)
+	deltaChan := make(chan string)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(msgChan)
+		defer close(deltaChan)
+		defer close(errChan)
+
+		// Create the stream
+		oaiMsgChan, oaiDeltaChan, oaiErrChan, err := p.client.ChatStream(ctx, &client.ChatRequest{
+			Model:    p.model.ID,
+			Messages: opts.Messages,
+			Tools:    opts.Tools,
+		})
+		if err != nil {
+			errChan <- fmt.Errorf("error creating stream: %w", err)
+			return
+		}
+
+		for {
+			select {
+			case msg, ok := <-oaiMsgChan:
+				if !ok {
+					return
+				}
+				msgChan <- &msg.Message
+			case delta, ok := <-oaiDeltaChan:
+				if !ok {
+					return
+				}
+				deltaChan <- delta
+			case err, ok := <-oaiErrChan:
+				if !ok {
+					return
+				}
+				errChan <- err
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return msgChan, deltaChan, errChan
 }
