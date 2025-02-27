@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/agent-api/core/types"
@@ -33,7 +34,15 @@ func convertMessageToOpenAIMessage(m *types.Message) openai.ChatCompletionMessag
 		return message
 
 	case types.ToolMessageRole:
-		message := openai.ToolMessage(m.ToolResult.ToolCallID, m.Content)
+		var s strings.Builder
+
+		s.WriteString(fmt.Sprintf("%v", m.ToolResult[0].Content))
+
+		if m.ToolResult[0].Error != "" {
+			s.WriteString(m.ToolResult[0].Error)
+		}
+
+		message := openai.ToolMessage(m.ToolResult[0].ToolCallID, s.String())
 		return message
 	}
 
