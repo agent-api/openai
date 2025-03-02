@@ -114,8 +114,13 @@ func (c *OpenAIClient) Chat(ctx context.Context, req *ChatRequest) (ChatResponse
 	}, nil
 }
 
-func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *ChatResponse, <-chan string, <-chan error, error) {
+func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *types.Message, <-chan string, <-chan error) {
 	c.logger.Debug("received chat stream message request")
+
+	msgChan := make(chan *types.Message)
+	deltaChan := make(chan string)
+	errChan := make(chan error, 1)
+
 	openaiMessages := []openai.ChatCompletionMessageParamUnion{}
 	for _, message := range req.Messages {
 		openaiMessages = append(openaiMessages, convertMessageToOpenAIMessage(message))
@@ -126,7 +131,11 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 	for _, tool := range req.Tools {
 		t, err := ToOpenAIToolParam(tool)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("error converting tool: %w", err)
+			errChan <- fmt.Errorf("error converting tool: %w", err)
+			close(msgChan)
+			close(deltaChan)
+			close(errChan)
+			return msgChan, deltaChan, errChan
 		}
 		openaiTools = append(openaiTools, *t)
 	}
@@ -139,10 +148,6 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 	if len(openaiTools) > 0 {
 		chatParams.Tools = openai.F(openaiTools)
 	}
-
-	msgChan := make(chan *ChatResponse)
-	deltaChan := make(chan string)
-	errChan := make(chan error, 1)
 
 	c.logger.Debug("kicking async go func for chat stream")
 
@@ -170,10 +175,8 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 			if content, ok := acc.JustFinishedContent(); ok {
 				// send the final message.
 				// Blocks on reader grabbing message off channel
-				msgChan <- &ChatResponse{
-					Message: types.Message{
-						Content: content,
-					},
+				msgChan <- &types.Message{
+					Content: content,
 				}
 			}
 
@@ -181,14 +184,12 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 			if tool, ok := acc.JustFinishedToolCall(); ok {
 				// send message with tool call to msg chan.
 				// blocks on message being consumed by consumer.
-				msgChan <- &ChatResponse{
-					Message: types.Message{
-						ToolCalls: []*types.ToolCall{
-							{
-								ID:        "woof_stream_tool",
-								Name:      tool.Name,
-								Arguments: json.RawMessage(tool.Arguments),
-							},
+				msgChan <- &types.Message{
+					ToolCalls: []*types.ToolCall{
+						{
+							ID:        "woof_stream_tool",
+							Name:      tool.Name,
+							Arguments: json.RawMessage(tool.Arguments),
 						},
 					},
 				}
@@ -215,5 +216,5 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 		}
 	}()
 
-	return msgChan, deltaChan, errChan, nil
+	return msgChan, deltaChan, errChan
 }

@@ -1,14 +1,7 @@
-github.com/agent-api/core v0.0.0-20250213143732-77b2a39cf1f9 h1:bxpmrZmFlrhXZrs3lKnCMa/8jLYji9QD8LhK4wNjfUU=
-github.com/agent-api/core v0.0.0-20250213143732-77b2a39cf1f9/go.mod h1:dubJb1P6cSuYOqQvBX/R9inWvHPMDuXCEwqwZfzXWTk=
 github.com/agent-api/core v0.0.0-20250227162826-246be7c4b3ff h1:6oife6RpbYLDLkLJw6iXJkGAJsbX4b3cbnkRYx3Ton4=
 github.com/agent-api/core v0.0.0-20250227162826-246be7c4b3ff/go.mod h1:dubJb1P6cSuYOqQvBX/R9inWvHPMDuXCEwqwZfzXWTk=
-github.com/openai/openai-go v0.1.0-alpha.57 h1:WsOsIQzxXL3shbRs8xUoYgi1oSS4yyKEKDpQ0vhHijk=
-github.com/openai/openai-go v0.1.0-alpha.57/go.mod h1:3SdE6BffOX9HPEQv8IL/fi3LYZ5TUpRYaqGQZbyk11A=
-github.com/openai/openai-go v0.1.0-alpha.59 h1:T3IYwKSCezfIlL9Oi+CGvU03fq0RoH33775S78Ti48Y=
-github.com/openai/openai-go v0.1.0-alpha.59/go.mod h1:3SdE6BffOX9HPEQv8IL/fi3LYZ5TUpRYaqGQZbyk11A=
+github.com/openai/openai-go v0.1.0-alpha.61 h1:dLJW1Dk15VAwm76xyPsiPt/Ky94NNGoMLETAI1ISoBY=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
-github.com/tidwall/gjson v1.14.4 h1:uo0p8EbA09J7RQaflQ1aBRffTR7xedD2bcIVSYxLnkM=
-github.com/tidwall/gjson v1.14.4/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.18.0 h1:FIDeeyB800efLX89e5a8Y0BNH+LOngJyGrIWxG2FKQY=
 github.com/tidwall/gjson v1.18.0/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=

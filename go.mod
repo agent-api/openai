@@ -4,7 +4,7 @@ go 1.23.3
 
 require (
 	github.com/agent-api/core v0.0.0-20250227162826-246be7c4b3ff
-	github.com/openai/openai-go v0.1.0-alpha.59
+	github.com/openai/openai-go v0.1.0-alpha.61
 )
 
 require (

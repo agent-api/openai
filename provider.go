@@ -90,49 +90,9 @@ func (p *Provider) Generate(ctx context.Context, opts *types.GenerateOptions) (*
 func (p *Provider) GenerateStream(ctx context.Context, opts *types.GenerateOptions) (<-chan *types.Message, <-chan string, <-chan error) {
 	p.logger.Info("Starting stream generation", "modelID", p.model.ID)
 
-	msgChan := make(chan *types.Message)
-	deltaChan := make(chan string)
-	errChan := make(chan error, 1)
-
-	go func() {
-		defer close(msgChan)
-		defer close(deltaChan)
-		defer close(errChan)
-
-		// Create the stream
-		oaiMsgChan, oaiDeltaChan, oaiErrChan, err := p.client.ChatStream(ctx, &client.ChatRequest{
-			Model:    p.model.ID,
-			Messages: opts.Messages,
-			Tools:    opts.Tools,
-		})
-		if err != nil {
-			errChan <- fmt.Errorf("error creating stream: %w", err)
-			return
-		}
-
-		for {
-			select {
-			case msg, ok := <-oaiMsgChan:
-				if !ok {
-					return
-				}
-				msgChan <- &msg.Message
-			case delta, ok := <-oaiDeltaChan:
-				if !ok {
-					return
-				}
-				deltaChan <- delta
-			case err, ok := <-oaiErrChan:
-				if !ok {
-					return
-				}
-				errChan <- err
-				return
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return msgChan, deltaChan, errChan
+	return p.client.ChatStream(ctx, &client.ChatRequest{
+		Model:    p.model.ID,
+		Messages: opts.Messages,
+		Tools:    opts.Tools,
+	})
 }
