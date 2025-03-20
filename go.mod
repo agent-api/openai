@@ -3,8 +3,9 @@ module github.com/agent-api/openai
 go 1.23.3
 
 require (
-	github.com/agent-api/core v0.0.0-20250227162826-246be7c4b3ff
-	github.com/openai/openai-go v0.1.0-alpha.61
+	github.com/agent-api/core v0.0.0-20250320002200-9e435dd4d404
+	github.com/go-logr/logr v1.4.2
+	github.com/openai/openai-go v0.1.0-alpha.65
 )
 
 require (

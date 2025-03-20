@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agent-api/core/types"
+	"github.com/agent-api/core"
 	"github.com/openai/openai-go"
 )
 
-func convertMessageToOpenAIMessage(m *types.Message) openai.ChatCompletionMessageParamUnion {
+func convertMessageToOpenAIMessage(m *core.Message) openai.ChatCompletionMessageParamUnion {
 	switch m.Role {
-	case types.UserMessageRole:
+	case core.UserMessageRole:
 		message := openai.UserMessage(m.Content)
 		return message
 
-	case types.AssistantMessageRole:
+	case core.AssistantMessageRole:
 		message := openai.AssistantMessage(m.Content)
 
 		toolCalls := []openai.ChatCompletionMessageToolCallParam{}
@@ -33,7 +33,7 @@ func convertMessageToOpenAIMessage(m *types.Message) openai.ChatCompletionMessag
 
 		return message
 
-	case types.ToolMessageRole:
+	case core.ToolMessageRole:
 		var s strings.Builder
 
 		s.WriteString(fmt.Sprintf("%v", m.ToolResult[0].Content))
@@ -49,7 +49,7 @@ func convertMessageToOpenAIMessage(m *types.Message) openai.ChatCompletionMessag
 	return nil
 }
 
-func convertOpenAIMessageToMessage(m *openai.Message) types.Message {
+func convertOpenAIMessageToMessage(m *openai.Message) core.Message {
 	content := strings.Builder{}
 
 	for _, c := range m.Content {
@@ -61,46 +61,46 @@ func convertOpenAIMessageToMessage(m *openai.Message) types.Message {
 
 	switch m.Role {
 	case "user":
-		return types.Message{
-			Role:    types.UserMessageRole,
+		return core.Message{
+			Role:    core.UserMessageRole,
 			Content: content.String(),
 		}
 
 	case "assistant":
-		return types.Message{
-			Role:    types.AssistantMessageRole,
+		return core.Message{
+			Role:    core.AssistantMessageRole,
 			Content: content.String(),
 		}
 	}
 
-	return types.Message{}
+	return core.Message{}
 }
 
-func OpenAIChatCompletionMessageToAgentAPIMessage(m *openai.ChatCompletionMessage) types.Message {
+func OpenAIChatCompletionMessageToAgentAPIMessage(m *openai.ChatCompletionMessage) core.Message {
 	switch m.Role {
 	case "user":
-		return types.Message{
-			Role:    types.UserMessageRole,
+		return core.Message{
+			Role:    core.UserMessageRole,
 			Content: m.Content,
 		}
 
 	case "assistant":
-		t := []*types.ToolCall{}
+		t := []*core.ToolCall{}
 
 		for _, tool := range m.ToolCalls {
-			t = append(t, &types.ToolCall{
+			t = append(t, &core.ToolCall{
 				ID:        tool.ID,
 				Name:      tool.Function.Name,
 				Arguments: json.RawMessage(tool.Function.Arguments),
 			})
 		}
 
-		return types.Message{
-			Role:      types.ToolMessageRole,
+		return core.Message{
+			Role:      core.ToolMessageRole,
 			Content:   m.Content,
 			ToolCalls: t,
 		}
 	}
 
-	return types.Message{}
+	return core.Message{}
 }

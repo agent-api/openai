@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 
-	"github.com/agent-api/core/types"
+	"github.com/agent-api/core"
+	"github.com/go-logr/logr"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
@@ -19,13 +19,13 @@ type OpenAIClient struct {
 
 	model string
 
-	logger *slog.Logger
+	logger *logr.Logger
 }
 
 // ClientOption is a function that modifies the client
 type ClientOption option.RequestOption
 
-func NewClient(logger *slog.Logger, options ...ClientOption) *OpenAIClient {
+func NewClient(logger *logr.Logger, options ...ClientOption) *OpenAIClient {
 	o := &OpenAIClient{}
 
 	for _, option := range options {
@@ -57,7 +57,7 @@ func WithHTTPClient(client *http.Client) ClientOption {
 }
 
 // Convert your Tool to OpenAI's ChatCompletionToolParam
-func ToOpenAIToolParam(t *types.Tool) (*openai.ChatCompletionToolParam, error) {
+func ToOpenAIToolParam(t *core.Tool) (*openai.ChatCompletionToolParam, error) {
 	var schemaMap map[string]interface{}
 	if err := json.Unmarshal(t.JSONSchema, &schemaMap); err != nil {
 		return nil, err
@@ -114,10 +114,10 @@ func (c *OpenAIClient) Chat(ctx context.Context, req *ChatRequest) (ChatResponse
 	}, nil
 }
 
-func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *types.Message, <-chan string, <-chan error) {
-	c.logger.Debug("received chat stream message request")
+func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *core.Message, <-chan string, <-chan error) {
+	c.logger.V(1).Info("received chat stream message request")
 
-	msgChan := make(chan *types.Message)
+	msgChan := make(chan *core.Message)
 	deltaChan := make(chan string)
 	errChan := make(chan error, 1)
 
@@ -126,7 +126,7 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 		openaiMessages = append(openaiMessages, convertMessageToOpenAIMessage(message))
 	}
 
-	c.logger.Debug("creating openai tools")
+	c.logger.V(1).Info("creating openai tools")
 	openaiTools := []openai.ChatCompletionToolParam{}
 	for _, tool := range req.Tools {
 		t, err := ToOpenAIToolParam(tool)
@@ -149,7 +149,7 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 		chatParams.Tools = openai.F(openaiTools)
 	}
 
-	c.logger.Debug("kicking async go func for chat stream")
+	c.logger.V(1).Info("kicking async go func for chat stream")
 
 	go func() {
 		stream := c.client.Chat.Completions.NewStreaming(ctx, chatParams)
@@ -175,7 +175,7 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 			if content, ok := acc.JustFinishedContent(); ok {
 				// send the final message.
 				// Blocks on reader grabbing message off channel
-				msgChan <- &types.Message{
+				msgChan <- &core.Message{
 					Content: content,
 				}
 			}
@@ -184,8 +184,8 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 			if tool, ok := acc.JustFinishedToolCall(); ok {
 				// send message with tool call to msg chan.
 				// blocks on message being consumed by consumer.
-				msgChan <- &types.Message{
-					ToolCalls: []*types.ToolCall{
+				msgChan <- &core.Message{
+					ToolCalls: []*core.ToolCall{
 						{
 							ID:        "woof_stream_tool",
 							Name:      tool.Name,
@@ -196,7 +196,7 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan
 			}
 
 			if refusal, ok := acc.JustFinishedRefusal(); ok {
-				c.logger.Error("unhandled refusal stream finished", "refusal", refusal)
+				c.logger.V(0).Error(fmt.Errorf("open ai refusal hit"), "unhandled refusal stream finished", "refusal", refusal)
 			}
 
 			if len(chunk.Choices) > 0 {
